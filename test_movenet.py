@@ -162,17 +162,19 @@ class MoveNetDetector:
         
         return keypoints_with_scores, original_image
     
-    def draw_keypoints(self, image, keypoints_with_scores, confidence_threshold=0.3):
+    def draw_keypoints(self, image, keypoints_with_scores, confidence_threshold=0.3, show_cpr=True, show_all_keypoints=False):
         """
-        Gambar keypoints dan skeleton pada image
+        Gambar keypoints, skeleton, dan titik CPR pada image
         
         Args:
             image: Original image
             keypoints_with_scores: Output dari model [1, 1, 17, 3]
             confidence_threshold: Minimum confidence untuk menampilkan keypoint
+            show_cpr: Tampilkan titik CPR atau tidak
+            show_all_keypoints: Tampilkan semua keypoints dan skeleton (default: False)
             
         Returns:
-            Image dengan keypoints dan skeleton
+            Image dengan keypoints, skeleton, dan/atau titik CPR
         """
         height, width = image.shape[:2]
         output_image = image.copy()
@@ -180,43 +182,125 @@ class MoveNetDetector:
         # Extract keypoints [17, 3]
         keypoints = keypoints_with_scores[0, 0, :, :]
         
-        # Draw skeleton (connections)
-        for edge in KEYPOINT_EDGES:
-            y1, x1, c1 = keypoints[edge[0]]
-            y2, x2, c2 = keypoints[edge[1]]
+        # Hanya gambar skeleton dan keypoints jika show_all_keypoints=True
+        if show_all_keypoints:
+            # Draw skeleton (connections)
+            for edge in KEYPOINT_EDGES:
+                y1, x1, c1 = keypoints[edge[0]]
+                y2, x2, c2 = keypoints[edge[1]]
+                
+                if c1 > confidence_threshold and c2 > confidence_threshold:
+                    # Convert normalized coordinates to pixel coordinates
+                    x1_px = int(x1 * width)
+                    y1_px = int(y1 * height)
+                    x2_px = int(x2 * width)
+                    y2_px = int(y2 * height)
+                    
+                    # Draw line
+                    cv2.line(output_image, (x1_px, y1_px), (x2_px, y2_px), 
+                            (0, 255, 0), 2, cv2.LINE_AA)
             
-            if c1 > confidence_threshold and c2 > confidence_threshold:
-                # Convert normalized coordinates to pixel coordinates
-                x1_px = int(x1 * width)
-                y1_px = int(y1 * height)
-                x2_px = int(x2 * width)
-                y2_px = int(y2 * height)
-                
-                # Draw line
-                cv2.line(output_image, (x1_px, y1_px), (x2_px, y2_px), 
-                        (0, 255, 0), 2, cv2.LINE_AA)
+            # Draw keypoints
+            for idx, (y, x, confidence) in enumerate(keypoints):
+                if confidence > confidence_threshold:
+                    # Convert to pixel coordinates
+                    x_px = int(x * width)
+                    y_px = int(y * height)
+                    
+                    # Draw circle
+                    cv2.circle(output_image, (x_px, y_px), 5, (255, 0, 0), -1)
+                    cv2.circle(output_image, (x_px, y_px), 7, (0, 0, 255), 2)
+                    
+                    # Add label
+                    label = f"{KEYPOINT_NAMES[idx]}: {confidence:.2f}"
+                    cv2.putText(output_image, label, (x_px + 10, y_px), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
         
-        # Draw keypoints
-        for idx, (y, x, confidence) in enumerate(keypoints):
-            if confidence > confidence_threshold:
-                # Convert to pixel coordinates
-                x_px = int(x * width)
-                y_px = int(y * height)
+        # Draw CPR point (selalu ditampilkan jika show_cpr=True)
+        if show_cpr:
+            cpr_point = self.calculate_cpr_point(keypoints_with_scores, confidence_threshold)
+            
+            if cpr_point:
+                y_cpr, x_cpr = cpr_point['position']
+                x_cpr_px = int(x_cpr * width)
+                y_cpr_px = int(y_cpr * height)
                 
-                # Draw circle
-                cv2.circle(output_image, (x_px, y_px), 5, (255, 0, 0), -1)
-                cv2.circle(output_image, (x_px, y_px), 7, (0, 0, 255), 2)
+                # Draw CPR marker (larger, different color)
+                # Outer circle (red)
+                cv2.circle(output_image, (x_cpr_px, y_cpr_px), 15, (0, 0, 255), 3)
+                # Inner circle (yellow)
+                cv2.circle(output_image, (x_cpr_px, y_cpr_px), 10, (0, 255, 255), -1)
+                # Center dot (white)
+                cv2.circle(output_image, (x_cpr_px, y_cpr_px), 3, (255, 255, 255), -1)
+                
+                # Draw crosshair
+                cv2.line(output_image, (x_cpr_px - 20, y_cpr_px), (x_cpr_px + 20, y_cpr_px),
+                        (0, 255, 255), 2, cv2.LINE_AA)
+                cv2.line(output_image, (x_cpr_px, y_cpr_px - 20), (x_cpr_px, y_cpr_px + 20),
+                        (0, 255, 255), 2, cv2.LINE_AA)
                 
                 # Add label
-                label = f"{KEYPOINT_NAMES[idx]}: {confidence:.2f}"
-                cv2.putText(output_image, label, (x_px + 10, y_px), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
+                label = f"CPR POINT: {cpr_point['confidence']:.2f}"
+                cv2.putText(output_image, label, (x_cpr_px + 25, y_cpr_px - 10), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2, cv2.LINE_AA)
+                cv2.putText(output_image, "Titik Kompresi RJP", (x_cpr_px + 25, y_cpr_px + 10), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
         
         return output_image
     
+    def calculate_cpr_point(self, keypoints_with_scores, confidence_threshold=0.3):
+        """
+        Hitung titik kompresi CPR (RJP) berdasarkan posisi bahu dan pinggul
+        
+        Args:
+            keypoints_with_scores: Output dari model [1, 1, 17, 3]
+            confidence_threshold: Minimum confidence untuk kalkulasi
+            
+        Returns:
+            Dictionary dengan CPR point dan metadata
+        """
+        keypoints = keypoints_with_scores[0, 0, :, :]
+        
+        # Index keypoints: 5=left_shoulder, 6=right_shoulder, 11=left_hip, 12=right_hip
+        left_shoulder = keypoints[5]   # [y, x, confidence]
+        right_shoulder = keypoints[6]
+        left_hip = keypoints[11]
+        right_hip = keypoints[12]
+        
+        # Check confidence
+        if (left_shoulder[2] < confidence_threshold or 
+            right_shoulder[2] < confidence_threshold or
+            left_hip[2] < confidence_threshold or 
+            right_hip[2] < confidence_threshold):
+            return None
+        
+        # 1. Titik tengah bahu (shoulder midpoint)
+        x_s = (left_shoulder[1] + right_shoulder[1]) / 2
+        y_s = (left_shoulder[0] + right_shoulder[0]) / 2
+        
+        # 2. Titik tengah pinggul (hip midpoint)
+        x_h = (left_hip[1] + right_hip[1]) / 2
+        y_h = (left_hip[0] + right_hip[0]) / 2
+        
+        # 3. Estimasi titik CPR (α = 0.42 → 40-45% dari bahu ke pinggul)
+        alpha = 0.42
+        x_cpr = x_s + alpha * (x_h - x_s)
+        y_cpr = y_s + alpha * (y_h - y_s)
+        
+        # Confidence rata-rata dari 4 keypoints
+        avg_confidence = (left_shoulder[2] + right_shoulder[2] + 
+                         left_hip[2] + right_hip[2]) / 4
+        
+        return {
+            'position': (y_cpr, x_cpr),  # normalized coordinates
+            'confidence': avg_confidence,
+            'shoulder_midpoint': (y_s, x_s),
+            'hip_midpoint': (y_h, x_h)
+        }
+    
     def print_keypoints(self, keypoints_with_scores, confidence_threshold=0.3):
         """
-        Print informasi keypoints ke console
+        Print informasi keypoints dan titik CPR ke console
         
         Args:
             keypoints_with_scores: Output dari model [1, 1, 17, 3]
@@ -233,6 +317,28 @@ class MoveNetDetector:
         for idx, (y, x, confidence) in enumerate(keypoints):
             if confidence > confidence_threshold:
                 print(f"{idx+1:<4} {KEYPOINT_NAMES[idx]:<18} {y:.4f}  {x:.4f}  {confidence:.4f}")
+        
+        print("="*60)
+        
+        # Calculate and print CPR point
+        cpr_point = self.calculate_cpr_point(keypoints_with_scores, confidence_threshold)
+        
+        if cpr_point:
+            print("\n" + "="*60)
+            print("TITIK KOMPRESI CPR (RJP)")
+            print("="*60)
+            y_cpr, x_cpr = cpr_point['position']
+            print(f"Posisi (normalized):")
+            print(f"  X: {x_cpr:.4f}")
+            print(f"  Y: {y_cpr:.4f}")
+            print(f"Confidence: {cpr_point['confidence']:.4f}")
+            print("\nCatatan:")
+            print("- Titik berada di tengah dada (setengah bawah sternum)")
+            print("- Estimasi: 40-45% jarak dari bahu ke pinggul")
+            print("- Untuk edukasi dan simulasi CPR")
+            print("="*60)
+        else:
+            print("\n⚠ Tidak dapat menghitung titik CPR (keypoints tidak lengkap)")
         
         print("="*60)
 
@@ -269,7 +375,8 @@ def main():
         detector.print_keypoints(keypoints_with_scores)
         
         # Draw keypoints
-        result_image = detector.draw_keypoints(original_image, keypoints_with_scores)
+        result_image = detector.draw_keypoints(original_image, keypoints_with_scores, 
+                                               show_cpr=True, show_all_keypoints=False)
         
         # Display hasil
         plt.figure(figsize=(12, 6))
@@ -281,7 +388,7 @@ def main():
         
         plt.subplot(1, 2, 2)
         plt.imshow(result_image)
-        plt.title('Detected Pose')
+        plt.title('CPR Point Detection')
         plt.axis('off')
         
         plt.tight_layout()

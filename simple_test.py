@@ -64,6 +64,13 @@ def main():
         print(f"\n✓ Deteksi selesai!")
         print(f"  Keypoints terdeteksi: {visible_count} / 17")
         
+        # Check CPR point
+        cpr_point = detector.calculate_cpr_point(keypoints)
+        if cpr_point:
+            print(f"  ✓ Titik CPR terdeteksi (confidence: {cpr_point['confidence']:.2f})")
+        else:
+            print(f"  ⚠ Titik CPR tidak dapat dihitung")
+        
         if visible_count >= 10:
             print("  Status: ✓ Deteksi bagus!")
         elif visible_count >= 5:
@@ -72,7 +79,8 @@ def main():
             print("  Status: ✗ Deteksi kurang baik (coba gambar lain)")
         
         # Draw dan save
-        result_image = detector.draw_keypoints(original_image, keypoints)
+        result_image = detector.draw_keypoints(original_image, keypoints, 
+                                               show_cpr=True, show_all_keypoints=False)
         
         import cv2
         output_path = 'simple_test_result.jpg'

@@ -47,6 +47,23 @@ Project untuk deteksi pose manusia menggunakan MoveNet model dari Google. Tersed
 16. left_ankle
 17. right_ankle
 
+### ➕ Bonus Feature: CPR Point Detection
+
+Sistem ini juga menghitung **titik kompresi CPR (RJP)** secara otomatis!
+
+- 📍 **Lokasi:** Tengah dada, setengah bawah sternum
+- 🧮 **Metode:** Estimasi geometris dari bahu dan pinggul
+- 📊 **Akurasi:** Confidence score berdasarkan 4 keypoints
+- 🎯 **Aplikasi:** Edukasi CPR, simulasi training, penelitian AI
+
+**🎨 Visualization Modes:**
+- **CPR-Only Mode** (Default): Hanya tampilkan titik CPR ⭐
+- **Full Detection Mode**: Tampilkan semua keypoints + CPR
+
+**Detail lengkap:** 
+- Formula: [CPR_CALCULATION.md](CPR_CALCULATION.md)
+- Mode display: [CPR_ONLY_MODE.md](CPR_ONLY_MODE.md)
+
 ---
 
 ## 🐍 Python Testing Script
@@ -112,11 +129,28 @@ detector = MoveNetDetector('4.tflite')
 # Detect pose
 keypoints, original_image = detector.detect('image.jpg')
 
-# Print keypoints
+# Print keypoints (including CPR point)
 detector.print_keypoints(keypoints)
 
-# Draw visualization
-result = detector.draw_keypoints(original_image, keypoints)
+# Calculate CPR point
+cpr_point = detector.calculate_cpr_point(keypoints)
+if cpr_point:
+    y_cpr, x_cpr = cpr_point['position']
+    print(f"CPR Point: ({x_cpr}, {y_cpr})")
+    print(f"Confidence: {cpr_point['confidence']}")
+
+# Draw visualization - 3 modes available:
+# Mode 1: CPR only (default, recommended)
+result_cpr = detector.draw_keypoints(original_image, keypoints, 
+                                     show_cpr=True, show_all_keypoints=False)
+
+# Mode 2: Full detection (all keypoints + CPR)
+result_full = detector.draw_keypoints(original_image, keypoints, 
+                                      show_cpr=True, show_all_keypoints=True)
+
+# Mode 3: Keypoints only (no CPR)
+result_kp = detector.draw_keypoints(original_image, keypoints, 
+                                    show_cpr=False, show_all_keypoints=True)
 ```
 
 ---

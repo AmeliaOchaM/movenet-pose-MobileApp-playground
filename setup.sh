@@ -18,19 +18,37 @@ fi
 
 echo "✓ Python 3 found"
 
-# Create virtual environment (optional)
-echo -e "\n2. Creating virtual environment (recommended)..."
-read -p "Create virtual environment? (y/n): " create_venv
-
-if [ "$create_venv" = "y" ]; then
+# Check if conda is available
+echo -e "\n2. Checking for Conda..."
+if command -v conda &> /dev/null; then
+    echo "✓ Conda found"
+    
+    # Create conda environment
+    echo -e "\n3. Creating Conda environment 'movenet-env'..."
+    conda create -n movenet-env python=3.10 -y
+    
+    if [ $? -ne 0 ]; then
+        echo "✗ Failed to create conda environment"
+        exit 1
+    fi
+    
+    echo "✓ Conda environment created"
+    echo "Activating environment..."
+    
+    # Activate conda environment
+    eval "$(conda shell.bash hook)"
+    conda activate movenet-env
+    
+    echo "✓ Environment activated: movenet-env"
+else
+    echo "✗ Conda not found. Creating venv instead..."
     python3 -m venv venv
     echo "✓ Virtual environment created"
-    echo "Activate it with: source venv/bin/activate"
     source venv/bin/activate
 fi
 
 # Install requirements
-echo -e "\n3. Installing Python dependencies..."
+echo -e "\n4. Installing Python dependencies..."
 pip install -r requirements.txt
 
 if [ $? -ne 0 ]; then
@@ -41,7 +59,7 @@ fi
 echo "✓ Dependencies installed"
 
 # Check model file
-echo -e "\n4. Checking model file..."
+echo -e "\n5. Checking model file..."
 if [ -f "4.tflite" ]; then
     echo "✓ Model file found: 4.tflite"
 else
@@ -54,6 +72,9 @@ fi
 echo -e "\n=========================================="
 echo "✓ Setup complete!"
 echo "=========================================="
+echo -e "\nConda environment: movenet-env"
+echo -e "\nTo activate environment:"
+echo "  conda activate movenet-env"
 echo -e "\nNext steps:"
 echo "1. Prepare a test image (person standing/posing)"
 echo "2. Run: python simple_test.py"
