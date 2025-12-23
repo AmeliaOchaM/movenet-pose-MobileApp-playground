@@ -162,6 +162,39 @@ class MoveNetDetector:
         
         return keypoints_with_scores, original_image
     
+    def detect_from_frame(self, frame):
+        """
+        Deteksi pose dari frame webcam (numpy array)
+        
+        Args:
+            frame: Frame dari webcam (numpy array BGR)
+            
+        Returns:
+            keypoints_with_scores: Array [1, 1, 17, 3] berisi koordinat dan confidence
+        """
+        # Convert BGR to RGB
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        
+        # Resize dengan maintain aspect ratio (padding)
+        image_resized = self._resize_with_pad(frame_rgb, self.input_height, self.input_width)
+        
+        # Expand dimensions untuk batch
+        image_input = np.expand_dims(image_resized, axis=0)
+        
+        # Model expects uint8
+        image_input = image_input.astype(np.uint8)
+        
+        # Set tensor
+        self.interpreter.set_tensor(self.input_details[0]['index'], image_input)
+        
+        # Run inference
+        self.interpreter.invoke()
+        
+        # Get output
+        keypoints_with_scores = self.interpreter.get_tensor(self.output_details[0]['index'])
+        
+        return keypoints_with_scores
+    
     def draw_keypoints(self, image, keypoints_with_scores, confidence_threshold=0.3, show_cpr=True, show_all_keypoints=False):
         """
         Gambar keypoints, skeleton, dan titik CPR pada image
@@ -343,6 +376,128 @@ class MoveNetDetector:
         print("="*60)
 
 
+def run_webcam_detection():
+    """Function untuk real-time detection dari webcam"""
+    
+    print("="*60)
+    print("MoveNet CPR Detection - Webcam Mode")
+    print("="*60)
+    
+    # Initialize detector
+    print("\nLoading model...")
+    detector = MoveNetDetector('4.tflite')
+    print("✓ Model ready!")
+    
+    # Initialize webcam
+    print("\nMembuka webcam...")
+    cap = cv2.VideoCapture(0)
+    
+    if not cap.isOpened():
+        print("✗ Error: Tidak dapat membuka webcam!")
+        print("Pastikan webcam terhubung dan tidak digunakan aplikasi lain.")
+        return
+    
+    print("✓ Webcam ready!")
+    print("\n" + "="*60)
+    print("INSTRUKSI:")
+    print("="*60)
+    print("- Posisikan tubuh menghadap kamera (frontal view)")
+    print("- Pastikan tubuh terlihat dari kepala sampai pinggul")
+    print("- Titik CPR akan muncul otomatis di tengah dada")
+    print("\nKONTROL:")
+    print("- Tekan 'q' untuk keluar")
+    print("- Tekan 's' untuk screenshot")
+    print("- Tekan 'a' untuk toggle semua keypoints")
+    print("="*60)
+    
+    show_all = False
+    frame_count = 0
+    fps_time = 0
+    
+    try:
+        while True:
+            ret, frame = cap.read()
+            
+            if not ret:
+                print("✗ Error: Tidak dapat membaca frame dari webcam")
+                break
+            
+            frame_count += 1
+            
+            # Detect pose every frame
+            keypoints_with_scores = detector.detect_from_frame(frame)
+            
+            # Convert BGR to RGB untuk processing
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            
+            # Draw keypoints and CPR point
+            result_frame = detector.draw_keypoints(frame_rgb, keypoints_with_scores,
+                                                   show_cpr=True, 
+                                                   show_all_keypoints=show_all)
+            
+            # Convert back to BGR untuk display
+            result_frame_bgr = cv2.cvtColor(result_frame, cv2.COLOR_RGB2BGR)
+            
+            # Calculate FPS
+            import time
+            current_time = time.time()
+            if frame_count == 1:
+                fps_time = current_time
+            
+            fps = frame_count / (current_time - fps_time) if (current_time - fps_time) > 0 else 0
+            
+            # Get CPR point info
+            cpr_point = detector.calculate_cpr_point(keypoints_with_scores)
+            
+            # Add info overlay
+            cv2.putText(result_frame_bgr, f"FPS: {fps:.1f}", (10, 30),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+            
+            if cpr_point:
+                cv2.putText(result_frame_bgr, f"CPR Confidence: {cpr_point['confidence']:.2f}", 
+                           (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+                cv2.putText(result_frame_bgr, "Status: CPR POINT DETECTED", 
+                           (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+            else:
+                cv2.putText(result_frame_bgr, "Status: WAITING FOR POSE...", 
+                           (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+            
+            # Add controls hint
+            cv2.putText(result_frame_bgr, "Q:Quit | S:Screenshot | A:Toggle All Keypoints", 
+                       (10, result_frame_bgr.shape[0] - 10),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            
+            # Display frame
+            cv2.imshow('MoveNet CPR Detection - Webcam', result_frame_bgr)
+            
+            # Handle keyboard input
+            key = cv2.waitKey(1) & 0xFF
+            
+            if key == ord('q'):
+                print("\n✓ Keluar dari webcam mode")
+                break
+            elif key == ord('s'):
+                # Save screenshot
+                timestamp = time.strftime("%Y%m%d_%H%M%S")
+                filename = f"webcam_cpr_{timestamp}.jpg"
+                cv2.imwrite(filename, result_frame_bgr)
+                print(f"✓ Screenshot disimpan: {filename}")
+            elif key == ord('a'):
+                # Toggle show all keypoints
+                show_all = not show_all
+                mode = "Full Detection" if show_all else "CPR Only"
+                print(f"✓ Mode switched: {mode}")
+    
+    except KeyboardInterrupt:
+        print("\n✓ Interrupted by user")
+    
+    finally:
+        # Cleanup
+        cap.release()
+        cv2.destroyAllWindows()
+        print("\n✓ Webcam closed")
+
+
 def main():
     """Main function untuk testing"""
     
@@ -357,14 +512,19 @@ def main():
     detector = MoveNetDetector(model_path)
     
     # Minta user untuk input image path
-    print("\nMasukkan path ke image yang ingin dideteksi:")
-    print("(Contoh: test_image.jpg atau gunakan webcam dengan 'webcam')")
-    image_path = input("Path: ").strip()
+    print("\nPilih mode:")
+    print("1. Image file - Deteksi dari gambar")
+    print("2. Webcam - Real-time detection")
+    mode = input("\nPilih mode (1/2): ").strip()
     
-    if image_path.lower() == 'webcam':
-        print("\nFitur webcam akan dikembangkan selanjutnya!")
-        print("Untuk saat ini, silakan gunakan image file.")
+    if mode == '2':
+        run_webcam_detection()
         return
+    
+    # Mode image file
+    print("\nMasukkan path ke image yang ingin dideteksi:")
+    print("(Contoh: test_image.jpg)")
+    image_path = input("Path: ").strip()
     
     try:
         # Detect pose
