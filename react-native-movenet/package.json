@@ -1,0 +1,28 @@
+{
+  "name": "react-native-movenet",
+  "version": "1.0.0",
+  "description": "MoveNet Pose Detection untuk React Native Expo",
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "expo": "~51.0.0",
+    "expo-camera": "~15.0.0",
+    "expo-file-system": "~17.0.0",
+    "expo-image-picker": "~15.0.0",
+    "react": "18.2.0",
+    "react-native": "0.74.0",
+    "@tensorflow/tfjs": "^4.17.0",
+    "@tensorflow/tfjs-react-native": "^0.8.0",
+    "expo-gl": "~14.0.0",
+    "expo-gl-cpp": "~14.0.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.24.0"
+  },
+  "private": true
+}
