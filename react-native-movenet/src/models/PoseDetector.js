@@ -16,10 +16,11 @@ class PoseDetector {
 
   /**
    * Initialize pose detector
-   * @param {string} modelPath - Optional custom model path
+   * @param {string} modelPath - Optional custom model path or URL
+   * @param {boolean} useURL - If true, load from URL instead of assets
    * @returns {Promise<boolean>} Success status
    */
-  async initialize(modelPath = null) {
+  async initialize(modelPath = null, useURL = true) {
     try {
       console.log('Initializing Pose Detector...');
       
@@ -27,9 +28,18 @@ class PoseDetector {
       await tf.ready();
       
       // Load model
-      const success = modelPath 
-        ? await this.model.loadModel(modelPath)
-        : await this.model.loadModelFromAssets();
+      let success;
+      if (modelPath) {
+        // Custom model path provided
+        success = await this.model.loadModel(modelPath);
+      } else if (useURL) {
+        // Load from GitHub Pages (default)
+        console.log('📡 Loading model from GitHub Pages...');
+        success = await this.model.loadModelFromURL();
+      } else {
+        // Fallback to assets (will use mock model)
+        success = await this.model.loadModelFromAssets();
+      }
       
       this.isInitialized = success;
       
