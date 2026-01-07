@@ -16,9 +16,9 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as tf from '@tensorflow/tfjs';
-import { fetch, decodeJpeg } from '@tensorflow/tfjs-react-native';
 import PoseDetector from './src/models/PoseDetector';
 import PoseOverlay from './src/components/PoseOverlay';
+import CameraView from './src/components/CameraView';
 
 export default function App() {
   const [isModelLoading, setIsModelLoading] = useState(true);
@@ -27,6 +27,7 @@ export default function App() {
   const [poseResult, setPoseResult] = useState(null);
   const [isDetecting, setIsDetecting] = useState(false);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
+  const [showCamera, setShowCamera] = useState(false);
 
   useEffect(() => {
     initializeApp();
@@ -89,6 +90,26 @@ export default function App() {
     }
   };
 
+  const openCamera = () => {
+    setShowCamera(true);
+  };
+
+  const handleCameraClose = () => {
+    setShowCamera(false);
+  };
+
+  const handlePhotoCapture = (photoUri) => {
+    console.log('Photo captured:', photoUri);
+    setSelectedImage(photoUri);
+    setPoseResult(null);
+    setShowCamera(false);
+    
+    // Get image dimensions
+    Image.getSize(photoUri, (width, height) => {
+      setImageDimensions({ width, height });
+    });
+  };
+
   const detectPose = async () => {
     if (!selectedImage || !isModelReady) {
       alert('Pilih gambar terlebih dahulu atau model belum ready');
@@ -129,6 +150,16 @@ export default function App() {
     );
   }
 
+  // Tampilkan kamera jika showCamera true
+  if (showCamera) {
+    return (
+      <CameraView
+        onClose={handleCameraClose}
+        onCapture={handlePhotoCapture}
+      />
+    );
+  }
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
@@ -139,8 +170,12 @@ export default function App() {
       </View>
 
       <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.button} onPress={pickImage}>
-          <Text style={styles.buttonText}>📷 Pilih Gambar</Text>
+        <TouchableOpacity style={styles.button} onPress={openCamera}>
+          <Text style={styles.buttonText}>📸 Buka Kamera</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={[styles.button, styles.galleryButton]} onPress={pickImage}>
+          <Text style={styles.buttonText}>�️ Pilih dari Galeri</Text>
         </TouchableOpacity>
 
         {selectedImage && (
@@ -251,6 +286,9 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
+  },
+  galleryButton: {
+    backgroundColor: '#6200ea',
   },
   detectButton: {
     backgroundColor: '#00cc66',

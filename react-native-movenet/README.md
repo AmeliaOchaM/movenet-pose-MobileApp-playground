@@ -1,5 +1,13 @@
 # React Native MoveNet - Setup Instructions
 
+## ✨ Features
+
+- 📸 **Camera Integration** - Ambil foto langsung dari kamera mobile
+- 🖼️ **Gallery Picker** - Pilih gambar dari galeri
+- 🤖 **Pose Detection** - Deteksi pose menggunakan MoveNet model
+- 📊 **Real-time Analysis** - Analisis keypoints dan confidence score
+- 🎨 **Visual Overlay** - Tampilan skeleton overlay pada hasil deteksi
+
 ## 📦 Installation
 
 ### 1. Install Dependencies
