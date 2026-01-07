@@ -20,7 +20,7 @@ class PoseDetector {
    * @param {boolean} useURL - If true, load from URL instead of assets
    * @returns {Promise<boolean>} Success status
    */
-  async initialize(modelPath = null, useURL = true) {
+  async initialize(modelPath = null, useURL = false) { // ← UBAH true jadi false untuk offline mode
     try {
       console.log('Initializing Pose Detector...');
       
@@ -33,11 +33,12 @@ class PoseDetector {
         // Custom model path provided
         success = await this.model.loadModel(modelPath);
       } else if (useURL) {
-        // Load from GitHub Pages (default)
+        // Load from GitHub Pages (online mode)
         console.log('📡 Loading model from GitHub Pages...');
         success = await this.model.loadModelFromURL();
       } else {
-        // Fallback to assets (will use mock model)
+        // Fallback to assets (will use mock model) - OFFLINE MODE
+        console.log('🔌 Using OFFLINE mode with Mock Model');
         success = await this.model.loadModelFromAssets();
       }
       
